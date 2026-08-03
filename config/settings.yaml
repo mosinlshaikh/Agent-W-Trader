@@ -1,0 +1,15 @@
+system:
+  name: Agent-W-Trader
+  mode: paper
+
+ai:
+  provider: ollama
+  model: deepseek
+
+market:
+  exchange: NSE
+  timezone: Asia/Kolkata
+
+risk:
+  max_daily_loss_percent: 2
+  max_trade_risk_percent: 1
