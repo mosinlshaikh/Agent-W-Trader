@@ -91,7 +91,7 @@ class OrderManager:
                 f"Only APPROVED orders can be executed; current={order.status}"
             )
         if self.session_calendar:
-            self.session_calendar.assert_open(snapshot.timestamp)
+            self.session_calendar.assert_open(snapshot.observed_at)
         order.status = OrderStatus.SUBMITTED
         self._save(order)
         try:
