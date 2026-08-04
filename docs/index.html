@@ -21,6 +21,7 @@
     <div class="status-cluster">
       <span class="badge paper"><i></i>PAPER MODE</span>
       <span id="systemStatus" class="badge healthy"><i></i>SYSTEM HEALTHY</span>
+      <button id="alertBtn" class="icon-button" type="button">ALERTS <b id="alertCount">0</b></button>
       <span id="clock" class="clock">--:--:--</span>
     </div>
   </header>
@@ -36,6 +37,7 @@
         <div class="hero-actions">
           <button id="startTradeBtn" class="primary">Run Paper Trade</button>
           <button id="layoutBtn" class="ghost">Cycle Layout</button>
+          <button id="saveLayoutBtn" class="ghost">Save Layout</button>
           <button id="focusResetBtn" class="ghost">Reset Focus</button>
         </div>
       </article>
@@ -50,7 +52,7 @@
     <section class="workspace-shell glass">
       <div class="workspace-head">
         <div><p class="eyebrow">LIVE MULTI-SCREEN WORKSPACE</p><h2>7-Screen Agent Matrix</h2></div>
-        <div class="workspace-meta"><span id="layoutLabel">Layout: Command</span><span id="streamPulse">● STREAMING</span></div>
+        <div class="workspace-meta"><span id="layoutLabel">Layout: Command</span><span>Drag cards · resize corner</span><span id="streamPulse">● STREAMING</span></div>
       </div>
       <div id="screenGrid" class="screen-grid layout-command"></div>
     </section>
@@ -81,7 +83,7 @@
     </section>
 
     <section class="panel glass">
-      <div class="panel-title"><div><p class="eyebrow">EXECUTION LEDGER</p><h2>Paper Orders</h2></div><span class="muted">Auto-refreshing</span></div>
+      <div class="panel-title"><div><p class="eyebrow">EXECUTION LEDGER</p><h2>Paper Orders</h2></div><span class="muted">Tap a row for full evidence</span></div>
       <div class="table-wrap">
         <table>
           <thead><tr><th>Time</th><th>Symbol</th><th>Agent</th><th>Side</th><th>Qty</th><th>Stage</th><th>Price</th><th>P&amp;L</th><th>Reason</th></tr></thead>
@@ -90,6 +92,18 @@
       </div>
     </section>
   </main>
+
+  <aside id="alertPanel" class="side-panel glass" aria-hidden="true">
+    <div class="drawer-head"><div><p class="eyebrow">SYSTEM EVENTS</p><h2>Alert Center</h2></div><button class="ghost close-drawer" data-close="alertPanel">Close</button></div>
+    <div id="alertList" class="alert-list"></div>
+  </aside>
+
+  <aside id="tradeDrawer" class="side-panel trade-drawer glass" aria-hidden="true">
+    <div class="drawer-head"><div><p class="eyebrow">TRADE EVIDENCE</p><h2 id="drawerTitle">Paper Trade</h2></div><button class="ghost close-drawer" data-close="tradeDrawer">Close</button></div>
+    <div id="tradeDetails" class="trade-details"></div>
+  </aside>
+
+  <div id="toast" class="toast">Layout saved</div>
 
   <nav class="mobile-nav glass">
     <a href="#metrics">Home</a><a href="#screenGrid">Screens</a><a href="#lifecycle">Trade</a><a href="#riskMeters">Risk</a>
