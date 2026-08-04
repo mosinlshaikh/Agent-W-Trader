@@ -7,7 +7,7 @@ from enum import Enum
 from typing import Optional
 from uuid import uuid4
 
-from pydantic import BaseModel, Field, field_validator
+from pydantic import BaseModel, Field, field_validator, model_validator
 
 
 class OrderSide(str, Enum):
@@ -47,13 +47,15 @@ class OrderRequest(BaseModel):
             raise ValueError("symbol contains unsupported characters")
         return symbol
 
-    @field_validator("limit_price")
-    @classmethod
-    def require_limit_price_for_limit_order(cls, value: Optional[float], info):
-        order_type = info.data.get("order_type")
-        if order_type == OrderType.LIMIT and value is None:
+    @model_validator(mode="after")
+    def validate_order_prices(self):
+        if self.order_type == OrderType.LIMIT and self.limit_price is None:
             raise ValueError("limit_price is required for LIMIT orders")
-        return value
+        if self.side == OrderSide.BUY and self.stop_loss_price >= self.reference_price:
+            raise ValueError("BUY stop loss must be below reference price")
+        if self.side == OrderSide.SELL and self.stop_loss_price <= self.reference_price:
+            raise ValueError("SELL stop loss must be above reference price")
+        return self
 
 
 class RiskDecision(BaseModel):
@@ -68,5 +70,7 @@ class Order(BaseModel):
     request: OrderRequest
     status: OrderStatus = OrderStatus.CREATED
     risk_decision: Optional[RiskDecision] = None
+    broker_order_id: Optional[str] = None
+    fill_price: Optional[float] = Field(default=None, gt=0)
     created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
     updated_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
