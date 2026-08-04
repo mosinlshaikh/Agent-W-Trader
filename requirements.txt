@@ -2,6 +2,7 @@
 # Core
 python-dotenv
 pydantic
+PyYAML
 
 # Data processing
 pandas
