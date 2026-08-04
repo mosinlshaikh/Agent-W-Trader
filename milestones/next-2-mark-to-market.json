@@ -1,0 +1,22 @@
+{
+  "project": "Agent-W-Trader",
+  "architect": "MOSIN LIYAKAT SHAIKH",
+  "mode": "PAPER_ONLY",
+  "milestone": 4,
+  "sub_part": 2,
+  "title": "Mark-to-Market Truth Engine",
+  "status": "CI_VERIFIED",
+  "production_readiness_percent": 25,
+  "milestone_four_percent": 65,
+  "source_commit": "2b5e7ff978fe4e95986834bf23eb29ec9ccdaf7b",
+  "ci_run": 48,
+  "capabilities": [
+    "reference price normalization",
+    "unrealized P&L",
+    "gross market value",
+    "net liquidation value",
+    "missing-price fail-closed blocking",
+    "stale-price fail-closed blocking",
+    "restart-safe SQLite valuation snapshots"
+  ]
+}
