@@ -1,4 +1,5 @@
 import sqlite3
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
 import pytest
@@ -14,13 +15,20 @@ from portfolio.portfolio_ledger import (
     InsufficientPositionError,
     PortfolioLedger,
 )
+from portfolio.valuation import (
+    MarkToMarketEngine,
+    MissingPriceError,
+    ReferencePrice,
+    SQLiteValuationSnapshotStore,
+    StalePriceError,
+)
 
 
 def make_ledger(tmp_path: Path) -> PortfolioLedger:
     return PortfolioLedger(SQLiteLedgerEventStore(tmp_path / "portfolio.db"))
 
 
-def test_ledger_rebuilds_authoritative_state_after_restart(tmp_path):
+def funded_position(tmp_path: Path) -> PortfolioLedger:
     ledger = make_ledger(tmp_path)
     ledger.record(LedgerEvent(event_type=LedgerEventType.CASH_DEPOSIT, amount=100_000))
     ledger.record(
@@ -32,6 +40,11 @@ def test_ledger_rebuilds_authoritative_state_after_restart(tmp_path):
             reference_id="fill-1",
         )
     )
+    return ledger
+
+
+def test_ledger_rebuilds_authoritative_state_after_restart(tmp_path):
+    ledger = funded_position(tmp_path)
     ledger.record(
         LedgerEvent(
             event_type=LedgerEventType.SELL_FILL,
@@ -142,3 +155,54 @@ def test_returned_state_is_not_mutable_authority(tmp_path):
     external_copy = ledger.state
     external_copy.cash_balance = 999_999
     assert ledger.state.cash_balance == 5_000
+
+
+def test_mark_to_market_calculates_unrealized_and_nlv(tmp_path):
+    ledger = funded_position(tmp_path)
+    now = datetime.now(timezone.utc)
+    valuation = MarkToMarketEngine().value(
+        ledger.state,
+        {"RELIANCE": ReferencePrice("reliance", 2_620, now)},
+        valued_at=now,
+    )
+
+    assert valuation.cash_balance == pytest.approx(75_000)
+    assert valuation.gross_market_value == pytest.approx(26_200)
+    assert valuation.unrealized_pnl == pytest.approx(1_200)
+    assert valuation.net_liquidation_value == pytest.approx(101_200)
+    assert valuation.positions[0].market_price == pytest.approx(2_620)
+
+
+def test_mark_to_market_blocks_missing_price(tmp_path):
+    ledger = funded_position(tmp_path)
+    with pytest.raises(MissingPriceError):
+        MarkToMarketEngine().value(ledger.state, {})
+
+
+def test_mark_to_market_blocks_stale_price(tmp_path):
+    ledger = funded_position(tmp_path)
+    now = datetime.now(timezone.utc)
+    stale = ReferencePrice("RELIANCE", 2_620, now - timedelta(seconds=16))
+    with pytest.raises(StalePriceError):
+        MarkToMarketEngine(max_price_age=timedelta(seconds=15)).value(
+            ledger.state,
+            {"RELIANCE": stale},
+            valued_at=now,
+        )
+
+
+def test_valuation_snapshot_survives_restart(tmp_path):
+    ledger = funded_position(tmp_path)
+    now = datetime.now(timezone.utc)
+    valuation = MarkToMarketEngine().value(
+        ledger.state,
+        {"RELIANCE": ReferencePrice("RELIANCE", 2_610, now)},
+        valued_at=now,
+    )
+    path = tmp_path / "valuations.db"
+    SQLiteValuationSnapshotStore(path).append(valuation)
+
+    latest = SQLiteValuationSnapshotStore(path).latest()
+    assert latest is not None
+    assert latest["net_liquidation_value"] == pytest.approx(101_100)
+    assert latest["positions"][0]["symbol"] == "RELIANCE"
