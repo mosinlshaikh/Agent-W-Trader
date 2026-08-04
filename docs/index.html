@@ -3,65 +3,96 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>Agent-W-Trader Paper Command Center</title>
+  <meta name="theme-color" content="#030712" />
+  <title>Agent-W-Trader | Sovereign Quant Command Center</title>
   <link rel="stylesheet" href="assets/dashboard.css" />
 </head>
 <body>
-  <header class="topbar">
-    <div>
-      <p class="eyebrow">AGENT-W-TRADER</p>
-      <h1>Paper Trading Command Center</h1>
+  <div class="scanlines" aria-hidden="true"></div>
+  <header class="topbar glass">
+    <div class="brand-block">
+      <div class="brand-mark">AW</div>
+      <div>
+        <p class="eyebrow">SOVEREIGN QUANT OPERATING SYSTEM</p>
+        <h1>Agent-W-Trader Command Center</h1>
+        <p class="architect">Architect <strong>MOSIN LIYAKAT SHAIKH</strong></p>
+      </div>
     </div>
     <div class="status-cluster">
-      <span class="badge paper">PAPER MODE</span>
-      <span id="systemStatus" class="badge healthy">SYSTEM HEALTHY</span>
+      <span class="badge paper"><i></i>PAPER MODE</span>
+      <span id="systemStatus" class="badge healthy"><i></i>SYSTEM HEALTHY</span>
+      <span id="clock" class="clock">--:--:--</span>
     </div>
   </header>
 
   <main>
+    <section class="hero-grid">
+      <article class="hero-card glass depth-card">
+        <div>
+          <p class="eyebrow">MISSION CONTROL</p>
+          <h2>Multi-Agent Paper Trading Grid</h2>
+          <p class="hero-copy">Monitor seven concurrent intelligence screens, trade lifecycles, risk vetoes and execution health from one cyber-grade surface.</p>
+        </div>
+        <div class="hero-actions">
+          <button id="startTradeBtn" class="primary">Run Paper Trade</button>
+          <button id="layoutBtn" class="ghost">Cycle Layout</button>
+          <button id="focusResetBtn" class="ghost">Reset Focus</button>
+        </div>
+      </article>
+      <aside class="readiness glass">
+        <div class="radar"><span>20%</span></div>
+        <div><p class="eyebrow">PRODUCTION READINESS</p><strong>UI Track Active</strong><small>Core engine remains paper-only</small></div>
+      </aside>
+    </section>
+
     <section class="metrics" id="metrics"></section>
 
-    <section class="panel progress-panel">
+    <section class="workspace-shell glass">
+      <div class="workspace-head">
+        <div><p class="eyebrow">LIVE MULTI-SCREEN WORKSPACE</p><h2>7-Screen Agent Matrix</h2></div>
+        <div class="workspace-meta"><span id="layoutLabel">Layout: Command</span><span id="streamPulse">● STREAMING</span></div>
+      </div>
+      <div id="screenGrid" class="screen-grid layout-command"></div>
+    </section>
+
+    <section class="panel glass lifecycle-panel">
       <div class="panel-title">
-        <div>
-          <p class="eyebrow">LIVE ORDER LIFECYCLE</p>
-          <h2 id="activeTradeTitle">Waiting for paper trade</h2>
-        </div>
-        <button id="startTradeBtn" type="button">Run Paper Trade</button>
+        <div><p class="eyebrow">LIVE ORDER LIFECYCLE</p><h2 id="activeTradeTitle">Preparing paper engine</h2></div>
+        <span id="tradeSymbol" class="symbol-chip">NIFTY-PAPER</span>
       </div>
       <div id="lifecycle" class="lifecycle"></div>
       <div class="watchdog">
         <div><span>Watchdog</span><strong id="watchdogState">READY</strong></div>
         <div><span>Last transition</span><strong id="lastTransition">—</strong></div>
         <div><span>Recovery action</span><strong id="recoveryAction">None</strong></div>
+        <div><span>Latency</span><strong id="latencyValue">18 ms</strong></div>
       </div>
     </section>
 
     <section class="grid two-column">
-      <article class="panel">
-        <div class="panel-title"><h2>Agent Grid</h2><span class="muted">Live simulation</span></div>
+      <article class="panel glass">
+        <div class="panel-title"><div><p class="eyebrow">AGENT NETWORK</p><h2>Intelligence Grid</h2></div><span class="muted">Live simulation</span></div>
         <div id="agents" class="agent-grid"></div>
       </article>
-
-      <article class="panel">
-        <div class="panel-title"><h2>Risk Command</h2><span id="riskMode" class="badge healthy">GREEN</span></div>
+      <article class="panel glass">
+        <div class="panel-title"><div><p class="eyebrow">SURVIVAL LAYER</p><h2>Risk Command</h2></div><span id="riskMode" class="badge healthy">GREEN</span></div>
         <div id="riskMeters"></div>
       </article>
     </section>
 
-    <section class="panel">
-      <div class="panel-title"><h2>Paper Orders</h2><span class="muted">Auto-refreshing</span></div>
+    <section class="panel glass">
+      <div class="panel-title"><div><p class="eyebrow">EXECUTION LEDGER</p><h2>Paper Orders</h2></div><span class="muted">Auto-refreshing</span></div>
       <div class="table-wrap">
         <table>
-          <thead><tr><th>Time</th><th>Symbol</th><th>Side</th><th>Qty</th><th>Stage</th><th>Price</th><th>P&amp;L</th><th>Reason</th></tr></thead>
+          <thead><tr><th>Time</th><th>Symbol</th><th>Agent</th><th>Side</th><th>Qty</th><th>Stage</th><th>Price</th><th>P&amp;L</th><th>Reason</th></tr></thead>
           <tbody id="ordersBody"></tbody>
         </table>
       </div>
     </section>
   </main>
 
-  <nav class="mobile-nav">
-    <a href="#metrics">Home</a><a href="#lifecycle">Trade</a><a href="#agents">Agents</a><a href="#riskMeters">Risk</a>
+  <nav class="mobile-nav glass">
+    <a href="#metrics">Home</a><a href="#screenGrid">Screens</a><a href="#lifecycle">Trade</a><a href="#riskMeters">Risk</a>
   </nav>
 
   <script src="assets/dashboard.js"></script>
