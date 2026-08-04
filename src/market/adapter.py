@@ -52,7 +52,7 @@ class InMemoryMarketDataAdapter(MarketDataAdapter):
         self._snapshots[normalized] = MarketSnapshot(
             symbol=normalized,
             price=price,
-            timestamp=timestamp or datetime.now(timezone.utc),
+            observed_at=timestamp or datetime.now(timezone.utc),
         )
 
     def get_snapshot(self, symbol: str) -> MarketSnapshot:
