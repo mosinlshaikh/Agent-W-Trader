@@ -1,0 +1,22 @@
+{
+  "milestone": 5,
+  "step": "Next 4",
+  "title": "Strategy Decision Safety Layer",
+  "status": "verified",
+  "ci_run": 54,
+  "source_commit": "b631f1e14f970b418ccb39184983e8fb1b008ab0",
+  "production_readiness_percent": 31,
+  "paper_mode": true,
+  "live_money_enabled": false,
+  "controls": [
+    "typed strategy signal contract",
+    "confidence threshold",
+    "stale and future signal rejection",
+    "duplicate semantic signal suppression",
+    "strategy-symbol cooldown",
+    "position-aware suppression",
+    "deterministic risk-engine validation",
+    "strategy disagreement consensus handling",
+    "explainable decision evidence"
+  ]
+}
