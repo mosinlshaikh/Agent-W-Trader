@@ -6,8 +6,11 @@ from datetime import datetime, timezone
 from typing import Dict, Optional
 
 from domain.models import Order, OrderRequest, OrderStatus
+from execution.idempotency import IdempotencyGuard
 from execution.paper_broker import PaperBroker
 from market.data_guard import MarketSnapshot
+from market.session_calendar import MarketSessionCalendar
+from observability.structured_logging import configure_logging
 from persistence.order_repository import SQLiteOrderRepository
 from risk.risk_engine import RiskEngine
 
@@ -27,9 +30,14 @@ class OrderManager:
         self,
         risk_engine: RiskEngine,
         repository: Optional[SQLiteOrderRepository] = None,
+        idempotency_guard: Optional[IdempotencyGuard] = None,
+        session_calendar: Optional[MarketSessionCalendar] = None,
     ) -> None:
         self.risk_engine = risk_engine
         self.repository = repository
+        self.idempotency_guard = idempotency_guard
+        self.session_calendar = session_calendar
+        self.logger = configure_logging()
         self._orders: Dict[str, Order] = {}
         if repository:
             self._orders = {order.id: order for order in repository.list_all()}
@@ -42,13 +50,24 @@ class OrderManager:
         return order
 
     def create_order(self, request: OrderRequest) -> Order:
+        if self.idempotency_guard:
+            self.idempotency_guard.register(request)
         order = Order(request=request)
         decision = self.risk_engine.evaluate(request)
         order.risk_decision = decision
         order.status = (
             OrderStatus.APPROVED if decision.approved else OrderStatus.RISK_REJECTED
         )
-        return self._save(order)
+        self._save(order)
+        self.logger.info(
+            "order evaluated",
+            extra={
+                "event": "ORDER_EVALUATED",
+                "order_id": order.id,
+                "symbol": request.symbol,
+            },
+        )
+        return order
 
     def get_order(self, order_id: str) -> Order:
         order = self._orders.get(order_id)
@@ -71,6 +90,8 @@ class OrderManager:
             raise InvalidOrderTransitionError(
                 f"Only APPROVED orders can be executed; current={order.status}"
             )
+        if self.session_calendar:
+            self.session_calendar.assert_open(snapshot.timestamp)
         order.status = OrderStatus.SUBMITTED
         self._save(order)
         try:
@@ -78,11 +99,25 @@ class OrderManager:
         except Exception:
             order.status = OrderStatus.REJECTED
             self._save(order)
+            self.logger.exception(
+                "paper execution rejected",
+                extra={"event": "ORDER_REJECTED", "order_id": order.id, "symbol": order.request.symbol},
+            )
             raise
         order.broker_order_id = fill.broker_order_id
         order.fill_price = fill.fill_price
         order.status = OrderStatus.FILLED
-        return self._save(order)
+        self._save(order)
+        self.logger.info(
+            "paper order filled",
+            extra={
+                "event": "ORDER_FILLED",
+                "order_id": order.id,
+                "symbol": order.request.symbol,
+                "broker_order_id": order.broker_order_id,
+            },
+        )
+        return order
 
     def mark_submitted(self, order_id: str) -> Order:
         order = self.get_order(order_id)
