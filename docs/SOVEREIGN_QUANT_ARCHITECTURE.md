@@ -142,6 +142,102 @@ Learning policy:
 - Candidate updates are trained offline, walk-forward tested, compared to champion models, reviewed, versioned, and deployed through approval gates.
 - Prevent look-ahead bias, leakage, survivorship bias, and repeated-test overfitting.
 
+### 11. Latency engineering and co-location readiness
+Purpose:
+- Measure and reduce end-to-end delay across market-data ingest, normalization, strategy evaluation, risk approval, order submission, broker acknowledgement, and reconciliation.
+
+Capabilities:
+- Nanosecond-capable monotonic timestamps where infrastructure permits.
+- Per-stage latency histograms: p50, p95, p99, and worst-case.
+- Clock synchronization monitoring and timestamp-quality flags.
+- Feed-to-decision, decision-to-order, order-to-ack, and ack-to-fill measurements.
+- Venue and provider latency comparison.
+- Simulation of co-located, cloud, and retail-internet environments.
+- Latency budget enforcement: stale decisions are cancelled rather than submitted.
+
+Boundary:
+- Co-location is an infrastructure and regulatory capability, not a software switch.
+- No claim of microsecond advantage without exchange-authorized access, certified connectivity, synchronized clocks, and measured production evidence.
+- Latency-arbitrage research remains simulation/shadow mode until legal, exchange, broker, and market-data permissions are verified.
+
+### 12. Cross-asset, basis, and parity arbitrage
+Research relationships:
+- Cash-futures fair value and annualized basis.
+- Calendar spreads across futures expiries.
+- Put-call parity and conversion/reversal relationships.
+- Box-spread and synthetic-forward consistency checks.
+- Index-versus-basket dislocation.
+- ETF-versus-NAV or related-instrument spreads where data and execution permissions exist.
+
+Execution requirements:
+- Atomic or coordinated multi-leg order intent.
+- Leg-risk limits, timeout, unwind policy, and partial-fill recovery.
+- Borrow availability, margin, funding, taxes, corporate actions, dividends, lot sizes, and settlement rules included.
+- Net edge must remain positive after spread, slippage, impact, fees, and worst-case legging cost.
+
+Boundary:
+- No arbitrage is labelled “guaranteed.” Execution risk, basis persistence, liquidity, margin changes, and leg failure can create losses.
+
+### 13. Advanced Greeks and volatility-surface modeling
+Capabilities:
+- Per-position and portfolio delta, gamma, theta, vega, and rho.
+- Volatility smile/skew and expiry term structure.
+- Surface interpolation with arbitrage checks.
+- Forward-volatility and event-premium decomposition.
+- Sticky-strike and sticky-delta scenario analysis.
+- Delta-hedging simulator with transaction costs and discrete rebalancing.
+- Gamma-scalping and volatility-risk-premium research.
+- Stress cubes across spot, IV, skew, time decay, rates, and liquidity shocks.
+
+Boundary:
+- Delta-neutral does not mean risk-free. Gamma, vega, jump, skew, liquidity, model, and hedging risks remain.
+- Portfolio neutrality is measured continuously and bounded by policy, never assumed.
+
+### 14. Institutional execution algorithms
+Supported execution policies:
+- TWAP with configurable schedule and randomization.
+- VWAP and volume-participation execution.
+- POV/participation-rate control.
+- Implementation-shortfall optimization.
+- Arrival-price benchmarking.
+- Limit-order slicing with queue and cancellation controls.
+- Reserve/iceberg-style child-order abstractions only where the broker/venue explicitly supports them.
+
+Controls:
+- Maximum participation rate.
+- Minimum child-order size and throttling.
+- Price collars, spread limits, and adverse-selection checks.
+- Cancel/replace rate limits.
+- Market-impact and information-leakage monitoring.
+- Full parent-child audit trail.
+
+Boundary:
+- The objective is lawful market-impact reduction, not deceptive liquidity display.
+- Spoofing, layering, quote stuffing, or orders entered without genuine execution intent are prohibited.
+
+### 15. Alternative data, news, and sentiment intelligence
+Inputs may include only licensed, public, or explicitly authorized sources:
+- Global and domestic news feeds.
+- Economic calendars and official releases.
+- Exchange publications and corporate announcements.
+- FII/DII and other official market statistics.
+- Public social-media data where terms permit.
+- Earnings transcripts and regulatory filings.
+
+Pipeline:
+- Source identity, timestamp, license, and freshness validation.
+- Deduplication and entity linking.
+- Event classification and novelty scoring.
+- Sentiment, uncertainty, relevance, and source-reliability scores.
+- Cross-source confirmation before high-impact decisions.
+- Event-time alignment to prevent look-ahead bias.
+
+Controls:
+- Robots.txt, platform terms, copyright, privacy, and data-retention rules must be respected.
+- No bypassing authentication, paywalls, rate limits, or technical access controls.
+- Social-media signals are low-trust by default and cannot independently authorize trades.
+- News-derived signals must pass deterministic risk, cost, liquidity, and session controls.
+
 ## Multi-agent design
 Specialist agents:
 - MarketDataQualityAgent
@@ -152,6 +248,11 @@ Specialist agents:
 - SessionContextAgent
 - SectorCorrelationAgent
 - NewsEventAgent
+- AlternativeDataAgent
+- LatencyTelemetryAgent
+- ArbitrageRelationshipAgent
+- VolatilitySurfaceAgent
+- InstitutionalExecutionAgent
 - CostModelAgent
 - PortfolioRiskAgent
 - ExecutionAgent
@@ -193,9 +294,12 @@ Scale only after stability, capacity, and risk evidence.
 3. Cost/tax engine with effective-dated schedules.
 4. Candle, technical, and multi-timeframe feature engine.
 5. Order-book and liquidity analytics.
-6. Derivatives chain, OI, IV, and Greeks engine.
+6. Derivatives chain, OI, IV, Greeks, and volatility-surface engine.
 7. Session/regime policy engine.
 8. Correlation and portfolio risk engine.
-9. Execution simulator with partial fills and latency.
-10. Post-trade analytics, experiment registry, and governed model promotion.
-11. Live provider adapters only after all promotion gates.
+9. Execution simulator with partial fills, latency, and market impact.
+10. Cross-asset arbitrage relationship engine with multi-leg simulation.
+11. Institutional execution algorithms with parent-child order tracking.
+12. Alternative-data ingestion, licensing registry, and event intelligence.
+13. Post-trade analytics, experiment registry, and governed model promotion.
+14. Live provider and low-latency adapters only after all promotion gates.
