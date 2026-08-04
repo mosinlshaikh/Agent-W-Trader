@@ -1,11 +1,14 @@
-"""Risk-gated order lifecycle for paper trading and broker integration."""
+"""Risk-gated, persistent order lifecycle for safe paper trading."""
 
 from __future__ import annotations
 
 from datetime import datetime, timezone
-from typing import Dict
+from typing import Dict, Optional
 
 from domain.models import Order, OrderRequest, OrderStatus
+from execution.paper_broker import PaperBroker
+from market.data_guard import MarketSnapshot
+from persistence.order_repository import SQLiteOrderRepository
 from risk.risk_engine import RiskEngine
 
 
@@ -18,15 +21,25 @@ class InvalidOrderTransitionError(RuntimeError):
 
 
 class OrderManager:
-    """Creates orders and enforces deterministic pre-trade risk approval.
+    """Creates, risk-checks, persists, and paper-executes orders."""
 
-    This component does not submit live broker orders yet. Approved orders remain
-    explicitly marked as APPROVED until a broker execution service submits them.
-    """
-
-    def __init__(self, risk_engine: RiskEngine):
+    def __init__(
+        self,
+        risk_engine: RiskEngine,
+        repository: Optional[SQLiteOrderRepository] = None,
+    ) -> None:
         self.risk_engine = risk_engine
+        self.repository = repository
         self._orders: Dict[str, Order] = {}
+        if repository:
+            self._orders = {order.id: order for order in repository.list_all()}
+
+    def _save(self, order: Order) -> Order:
+        order.updated_at = datetime.now(timezone.utc)
+        self._orders[order.id] = order
+        if self.repository:
+            self.repository.save(order)
+        return order
 
     def create_order(self, request: OrderRequest) -> Order:
         order = Order(request=request)
@@ -35,18 +48,41 @@ class OrderManager:
         order.status = (
             OrderStatus.APPROVED if decision.approved else OrderStatus.RISK_REJECTED
         )
-        order.updated_at = datetime.now(timezone.utc)
-        self._orders[order.id] = order
-        return order
+        return self._save(order)
 
     def get_order(self, order_id: str) -> Order:
-        try:
-            return self._orders[order_id]
-        except KeyError as exc:
-            raise OrderNotFoundError(order_id) from exc
+        order = self._orders.get(order_id)
+        if order is None and self.repository:
+            order = self.repository.get(order_id)
+            if order:
+                self._orders[order.id] = order
+        if order is None:
+            raise OrderNotFoundError(order_id)
+        return order
 
     def list_orders(self) -> list[Order]:
         return list(self._orders.values())
+
+    def execute_paper(
+        self, order_id: str, broker: PaperBroker, snapshot: MarketSnapshot
+    ) -> Order:
+        order = self.get_order(order_id)
+        if order.status != OrderStatus.APPROVED:
+            raise InvalidOrderTransitionError(
+                f"Only APPROVED orders can be executed; current={order.status}"
+            )
+        order.status = OrderStatus.SUBMITTED
+        self._save(order)
+        try:
+            fill = broker.execute(order.model_copy(update={"status": OrderStatus.APPROVED}), snapshot)
+        except Exception:
+            order.status = OrderStatus.REJECTED
+            self._save(order)
+            raise
+        order.broker_order_id = fill.broker_order_id
+        order.fill_price = fill.fill_price
+        order.status = OrderStatus.FILLED
+        return self._save(order)
 
     def mark_submitted(self, order_id: str) -> Order:
         order = self.get_order(order_id)
@@ -55,8 +91,7 @@ class OrderManager:
                 f"Only APPROVED orders can be submitted; current={order.status}"
             )
         order.status = OrderStatus.SUBMITTED
-        order.updated_at = datetime.now(timezone.utc)
-        return order
+        return self._save(order)
 
     def mark_filled(self, order_id: str) -> Order:
         order = self.get_order(order_id)
@@ -65,8 +100,7 @@ class OrderManager:
                 f"Only SUBMITTED orders can be filled; current={order.status}"
             )
         order.status = OrderStatus.FILLED
-        order.updated_at = datetime.now(timezone.utc)
-        return order
+        return self._save(order)
 
     def cancel(self, order_id: str) -> Order:
         order = self.get_order(order_id)
@@ -75,5 +109,4 @@ class OrderManager:
                 f"Order cannot be cancelled from state {order.status}"
             )
         order.status = OrderStatus.CANCELLED
-        order.updated_at = datetime.now(timezone.utc)
-        return order
+        return self._save(order)
