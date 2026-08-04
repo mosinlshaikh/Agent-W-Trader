@@ -7,11 +7,13 @@ import pytest
 
 from domain.models import Order, OrderRequest, OrderSide, OrderStatus
 from execution.idempotency import DuplicateOrderError, IdempotencyGuard
+from execution.order_manager import OrderManager
 from execution.reconciler import BrokerOrderState, OrderReconciler
 from market.adapter import InMemoryMarketDataAdapter
 from market.session_calendar import MarketSessionCalendar
 from observability.health import ComponentHealth, HealthService, HealthStatus
 from observability.structured_logging import JsonFormatter
+from risk.risk_engine import RiskEngine
 
 
 def request() -> OrderRequest:
@@ -53,6 +55,17 @@ def test_idempotency_guard_blocks_duplicate_inside_window():
     with pytest.raises(DuplicateOrderError):
         guard.register(request(), now=now + timedelta(seconds=5))
     guard.register(request(), now=now + timedelta(seconds=31))
+
+
+def test_order_manager_enforces_idempotency_guard():
+    manager = OrderManager(
+        RiskEngine(account_equity=100_000),
+        idempotency_guard=IdempotencyGuard(window_seconds=30),
+    )
+    first = manager.create_order(request())
+    assert first.status == OrderStatus.APPROVED
+    with pytest.raises(DuplicateOrderError):
+        manager.create_order(request())
 
 
 def test_reconciler_updates_forward_state_and_ignores_regression():
