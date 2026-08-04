@@ -1,7 +1,6 @@
 system:
   name: Agent-W-Trader
   mode: paper
-  account_equity: 100000
 
 ai:
   provider: ollama
@@ -10,15 +9,24 @@ ai:
 market:
   exchange: NSE
   timezone: Asia/Kolkata
+  session_open: "09:15"
+  session_close: "15:30"
+  max_data_age_seconds: 5
 
 risk:
+  account_equity: 100000
   max_daily_loss_percent: 2
   max_trade_risk_percent: 1
   max_order_value: 500000
 
-paper_broker:
+execution:
+  broker: paper
   slippage_bps: 2
-  max_market_data_age_seconds: 5
+  idempotency_window_seconds: 30
 
 persistence:
   sqlite_path: data/agent_w_trader.db
+
+observability:
+  structured_logging: true
+  health_checks: true
