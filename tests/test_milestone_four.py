@@ -1,8 +1,13 @@
+import sqlite3
 from pathlib import Path
 
 import pytest
 
-from portfolio.event_store import DuplicateLedgerEventError, SQLiteLedgerEventStore
+from portfolio.event_store import (
+    DuplicateLedgerEventError,
+    LedgerIntegrityError,
+    SQLiteLedgerEventStore,
+)
 from portfolio.ledger_models import LedgerEvent, LedgerEventType
 from portfolio.portfolio_ledger import (
     InsufficientCashError,
@@ -91,6 +96,44 @@ def test_duplicate_event_is_rejected(tmp_path):
     store.append(event)
     with pytest.raises(DuplicateLedgerEventError):
         store.append(event)
+
+
+def test_duplicate_external_reference_is_rejected(tmp_path):
+    store = SQLiteLedgerEventStore(tmp_path / "portfolio.db")
+    store.append(
+        LedgerEvent(
+            event_type=LedgerEventType.BUY_FILL,
+            symbol="TCS",
+            quantity=1,
+            price=3_500,
+            reference_id="broker-fill-42",
+        )
+    )
+    with pytest.raises(DuplicateLedgerEventError):
+        store.append(
+            LedgerEvent(
+                event_type=LedgerEventType.BUY_FILL,
+                symbol="TCS",
+                quantity=1,
+                price=3_500,
+                reference_id="broker-fill-42",
+            )
+        )
+    assert store.count() == 1
+
+
+def test_tampered_financial_event_is_detected(tmp_path):
+    path = tmp_path / "portfolio.db"
+    store = SQLiteLedgerEventStore(path)
+    store.append(LedgerEvent(event_type=LedgerEventType.CASH_DEPOSIT, amount=10_000))
+
+    with sqlite3.connect(path) as connection:
+        connection.execute(
+            "UPDATE portfolio_events SET payload = REPLACE(payload, '10000.0', '90000.0')"
+        )
+
+    with pytest.raises(LedgerIntegrityError):
+        store.read_all()
 
 
 def test_returned_state_is_not_mutable_authority(tmp_path):
