@@ -6,7 +6,7 @@ from abc import ABC, abstractmethod
 from datetime import datetime, timezone
 from typing import Dict
 
-from domain.models import MarketSnapshot
+from market.data_guard import MarketSnapshot
 
 
 class MarketDataAdapter(ABC):
