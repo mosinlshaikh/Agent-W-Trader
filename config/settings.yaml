@@ -1,6 +1,7 @@
 system:
   name: Agent-W-Trader
   mode: paper
+  account_equity: 100000
 
 ai:
   provider: ollama
@@ -13,3 +14,11 @@ market:
 risk:
   max_daily_loss_percent: 2
   max_trade_risk_percent: 1
+  max_order_value: 500000
+
+paper_broker:
+  slippage_bps: 2
+  max_market_data_age_seconds: 5
+
+persistence:
+  sqlite_path: data/agent_w_trader.db
