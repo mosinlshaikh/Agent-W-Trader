@@ -7,7 +7,7 @@
   <title>Agent-W-Trader | Sovereign Quant Command Center</title>
   <link rel="stylesheet" href="assets/dashboard.css" />
 </head>
-<body>
+<body data-theme="cyan" data-density="comfortable">
   <div class="scanlines" aria-hidden="true"></div>
   <header class="topbar glass">
     <div class="brand-block">
@@ -22,6 +22,7 @@
       <span class="badge paper"><i></i>PAPER MODE</span>
       <span id="systemStatus" class="badge healthy"><i></i>SYSTEM HEALTHY</span>
       <button id="alertBtn" class="icon-button" type="button">ALERTS <b id="alertCount">0</b></button>
+      <button id="settingsBtn" class="icon-button" type="button">DISPLAY</button>
       <span id="clock" class="clock">--:--:--</span>
     </div>
   </header>
@@ -32,7 +33,7 @@
         <div>
           <p class="eyebrow">MISSION CONTROL</p>
           <h2>Multi-Agent Paper Trading Grid</h2>
-          <p class="hero-copy">Monitor seven concurrent intelligence screens, trade lifecycles, risk vetoes and execution health from one cyber-grade surface.</p>
+          <p class="hero-copy">Seven concurrent intelligence screens, advanced derivatives analytics, exposure maps, lifecycle controls and evidence-first execution monitoring.</p>
         </div>
         <div class="hero-actions">
           <button id="startTradeBtn" class="primary">Run Paper Trade</button>
@@ -42,8 +43,8 @@
         </div>
       </article>
       <aside class="readiness glass">
-        <div class="radar"><span>20%</span></div>
-        <div><p class="eyebrow">PRODUCTION READINESS</p><strong>UI Track Active</strong><small>Core engine remains paper-only</small></div>
+        <div class="radar"><span>21%</span></div>
+        <div><p class="eyebrow">PRODUCTION READINESS</p><strong>UI Track Active</strong><small>Paper-only engine boundary</small></div>
       </aside>
     </section>
 
@@ -52,16 +53,32 @@
     <section class="workspace-shell glass">
       <div class="workspace-head">
         <div><p class="eyebrow">LIVE MULTI-SCREEN WORKSPACE</p><h2>7-Screen Agent Matrix</h2></div>
-        <div class="workspace-meta"><span id="layoutLabel">Layout: Command</span><span>Drag cards · resize corner</span><span id="streamPulse">● STREAMING</span></div>
+        <div class="workspace-meta"><span id="layoutLabel">Layout: Command</span><span>Drag · Resize · Focus</span><span id="streamPulse">● STREAMING</span></div>
+      </div>
+      <div class="chart-toolbar">
+        <div class="control-group"><span>TIMEFRAME</span><button data-timeframe="1m">1m</button><button class="active" data-timeframe="5m">5m</button><button data-timeframe="15m">15m</button><button data-timeframe="1h">1H</button></div>
+        <div class="control-group"><span>INDICATORS</span><button class="active" data-indicator="vwap">VWAP</button><button data-indicator="ema">EMA</button><button data-indicator="volume">VOL</button></div>
+        <div class="control-group"><span>MODE</span><button id="autoScaleBtn" class="active">AUTO SCALE</button><button id="crosshairBtn">CROSSHAIR</button></div>
       </div>
       <div id="screenGrid" class="screen-grid layout-command"></div>
     </section>
 
+    <section class="analytics-grid">
+      <article class="panel glass options-panel">
+        <div class="panel-title"><div><p class="eyebrow">DERIVATIVES PHYSICS</p><h2>NIFTY Option Chain Geometry</h2></div><span id="maxPain" class="symbol-chip">MAX PAIN 24,600</span></div>
+        <div class="option-summary"><div><span>PCR OI</span><strong id="pcrValue">1.08</strong></div><div><span>ATM IV</span><strong>13.8%</strong></div><div><span>Expected Move</span><strong>±146</strong></div><div><span>Expiry Risk</span><strong class="warning-text">ELEVATED</strong></div></div>
+        <div id="optionChain" class="option-chain"></div>
+      </article>
+
+      <article class="panel glass heatmap-panel">
+        <div class="panel-title"><div><p class="eyebrow">PORTFOLIO GEOMETRY</p><h2>Exposure Heatmap</h2></div><span class="muted">Risk-weighted</span></div>
+        <div id="heatmap" class="heatmap"></div>
+        <div class="heatmap-legend"><span>Low</span><i></i><span>High</span></div>
+      </article>
+    </section>
+
     <section class="panel glass lifecycle-panel">
-      <div class="panel-title">
-        <div><p class="eyebrow">LIVE ORDER LIFECYCLE</p><h2 id="activeTradeTitle">Preparing paper engine</h2></div>
-        <span id="tradeSymbol" class="symbol-chip">NIFTY-PAPER</span>
-      </div>
+      <div class="panel-title"><div><p class="eyebrow">LIVE ORDER LIFECYCLE</p><h2 id="activeTradeTitle">Preparing paper engine</h2></div><span id="tradeSymbol" class="symbol-chip">NIFTY-PAPER</span></div>
       <div id="lifecycle" class="lifecycle"></div>
       <div class="watchdog">
         <div><span>Watchdog</span><strong id="watchdogState">READY</strong></div>
@@ -72,43 +89,22 @@
     </section>
 
     <section class="grid two-column">
-      <article class="panel glass">
-        <div class="panel-title"><div><p class="eyebrow">AGENT NETWORK</p><h2>Intelligence Grid</h2></div><span class="muted">Live simulation</span></div>
-        <div id="agents" class="agent-grid"></div>
-      </article>
-      <article class="panel glass">
-        <div class="panel-title"><div><p class="eyebrow">SURVIVAL LAYER</p><h2>Risk Command</h2></div><span id="riskMode" class="badge healthy">GREEN</span></div>
-        <div id="riskMeters"></div>
-      </article>
+      <article class="panel glass"><div class="panel-title"><div><p class="eyebrow">AGENT NETWORK</p><h2>Intelligence Grid</h2></div><span class="muted">Live simulation</span></div><div id="agents" class="agent-grid"></div></article>
+      <article class="panel glass"><div class="panel-title"><div><p class="eyebrow">SURVIVAL LAYER</p><h2>Risk Command</h2></div><span id="riskMode" class="badge healthy">GREEN</span></div><div id="riskMeters"></div></article>
     </section>
 
     <section class="panel glass">
       <div class="panel-title"><div><p class="eyebrow">EXECUTION LEDGER</p><h2>Paper Orders</h2></div><span class="muted">Tap a row for full evidence</span></div>
-      <div class="table-wrap">
-        <table>
-          <thead><tr><th>Time</th><th>Symbol</th><th>Agent</th><th>Side</th><th>Qty</th><th>Stage</th><th>Price</th><th>P&amp;L</th><th>Reason</th></tr></thead>
-          <tbody id="ordersBody"></tbody>
-        </table>
-      </div>
+      <div class="table-wrap"><table><thead><tr><th>Time</th><th>Symbol</th><th>Agent</th><th>Side</th><th>Qty</th><th>Stage</th><th>Price</th><th>P&amp;L</th><th>Reason</th></tr></thead><tbody id="ordersBody"></tbody></table></div>
     </section>
   </main>
 
-  <aside id="alertPanel" class="side-panel glass" aria-hidden="true">
-    <div class="drawer-head"><div><p class="eyebrow">SYSTEM EVENTS</p><h2>Alert Center</h2></div><button class="ghost close-drawer" data-close="alertPanel">Close</button></div>
-    <div id="alertList" class="alert-list"></div>
-  </aside>
-
-  <aside id="tradeDrawer" class="side-panel trade-drawer glass" aria-hidden="true">
-    <div class="drawer-head"><div><p class="eyebrow">TRADE EVIDENCE</p><h2 id="drawerTitle">Paper Trade</h2></div><button class="ghost close-drawer" data-close="tradeDrawer">Close</button></div>
-    <div id="tradeDetails" class="trade-details"></div>
-  </aside>
-
+  <aside id="alertPanel" class="side-panel glass" aria-hidden="true"><div class="drawer-head"><div><p class="eyebrow">SYSTEM EVENTS</p><h2>Alert Center</h2></div><button class="ghost close-drawer" data-close="alertPanel">Close</button></div><div class="notification-controls"><label><input id="soundToggle" type="checkbox" /> Sound</label><label><input id="vibrationToggle" type="checkbox" /> Vibration</label></div><div id="alertList" class="alert-list"></div></aside>
+  <aside id="settingsPanel" class="side-panel glass" aria-hidden="true"><div class="drawer-head"><div><p class="eyebrow">OPERATOR DISPLAY</p><h2>Surface Settings</h2></div><button class="ghost close-drawer" data-close="settingsPanel">Close</button></div><div class="settings-stack"><div class="setting-block"><span>Theme</span><button data-theme-value="cyan" class="active">Cyber Cyan</button><button data-theme-value="violet">Quantum Violet</button><button data-theme-value="amber">Command Amber</button></div><div class="setting-block"><span>Density</span><button data-density-value="comfortable" class="active">Comfortable</button><button data-density-value="compact">Compact</button></div><div class="setting-block"><span>Motion</span><button id="motionToggle" class="active">Enabled</button></div></div></aside>
+  <aside id="tradeDrawer" class="side-panel trade-drawer glass" aria-hidden="true"><div class="drawer-head"><div><p class="eyebrow">TRADE EVIDENCE</p><h2 id="drawerTitle">Paper Trade</h2></div><button class="ghost close-drawer" data-close="tradeDrawer">Close</button></div><div id="tradeDetails" class="trade-details"></div></aside>
   <div id="toast" class="toast">Layout saved</div>
 
-  <nav class="mobile-nav glass">
-    <a href="#metrics">Home</a><a href="#screenGrid">Screens</a><a href="#lifecycle">Trade</a><a href="#riskMeters">Risk</a>
-  </nav>
-
+  <nav class="mobile-nav glass"><a href="#metrics">Home</a><a href="#screenGrid">Screens</a><a href="#optionChain">F&O</a><a href="#riskMeters">Risk</a></nav>
   <script src="assets/dashboard.js"></script>
 </body>
 </html>
