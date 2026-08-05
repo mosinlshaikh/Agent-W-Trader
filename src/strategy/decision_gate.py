@@ -5,7 +5,7 @@ from __future__ import annotations
 from datetime import datetime, timedelta, timezone
 from enum import Enum
 from hashlib import sha256
-from typing import Iterable
+from typing import Iterable, Protocol
 from uuid import uuid4
 
 from pydantic import BaseModel, Field, field_validator, model_validator
@@ -87,8 +87,14 @@ class DecisionEvidence(BaseModel):
     order_request: OrderRequest | None = None
 
 
+class DecisionJournal(Protocol):
+    def record_decision(self, signal: StrategySignal, evidence: DecisionEvidence, *, order_id: str | None = None) -> None: ...
+    def is_quarantined(self, strategy: str) -> bool: ...
+    def quarantine_reason(self, strategy: str) -> str | None: ...
+
+
 class StrategyDecisionGate:
-    """Fail-closed signal gate with duplicate, cooldown, position, and risk checks."""
+    """Fail-closed signal gate with duplicate, cooldown, position, risk, and worker checks."""
 
     def __init__(
         self,
@@ -98,6 +104,7 @@ class StrategyDecisionGate:
         cooldown: timedelta = timedelta(minutes=5),
         maximum_signal_age: timedelta = timedelta(minutes=2),
         minimum_consensus_ratio: float = 0.60,
+        decision_journal: DecisionJournal | None = None,
     ) -> None:
         if not 0 <= minimum_confidence <= 1:
             raise ValueError("minimum_confidence must be between 0 and 1")
@@ -110,6 +117,7 @@ class StrategyDecisionGate:
         self.cooldown = cooldown
         self.maximum_signal_age = maximum_signal_age
         self.minimum_consensus_ratio = minimum_consensus_ratio
+        self.decision_journal = decision_journal
         self._seen_signal_ids: set[str] = set()
         self._seen_fingerprints: set[str] = set()
         self._last_approved: dict[tuple[str, str, SignalAction], datetime] = {}
@@ -126,6 +134,9 @@ class StrategyDecisionGate:
             raise ValueError("now must be timezone-aware")
         fingerprint = signal.fingerprint()
 
+        if self.decision_journal is not None and self.decision_journal.is_quarantined(signal.strategy):
+            reason = self.decision_journal.quarantine_reason(signal.strategy) or "worker performance policy"
+            return self._decision(signal, DecisionStatus.SUPPRESSED, "WORKER_QUARANTINED", f"Strategy worker is quarantined: {reason}", evaluated_at)
         if signal.signal_id in self._seen_signal_ids or fingerprint in self._seen_fingerprints:
             return self._decision(signal, DecisionStatus.SUPPRESSED, "DUPLICATE_SIGNAL", "Signal was already evaluated", evaluated_at)
 
@@ -160,22 +171,14 @@ class StrategyDecisionGate:
         )
         risk = self.risk_engine.evaluate(order)
         if not risk.approved:
-            return self._decision(
-                signal,
-                DecisionStatus.REJECTED,
-                "RISK_REJECTED",
-                risk.reason,
-                evaluated_at,
-                risk_decision=risk,
-                order_request=order,
-            )
+            return self._decision(signal, DecisionStatus.REJECTED, "RISK_REJECTED", risk.reason, evaluated_at, risk_decision=risk, order_request=order)
 
         self._last_approved[key] = evaluated_at
         return self._decision(
             signal,
             DecisionStatus.APPROVED,
             "ALL_CHECKS_PASSED",
-            "Signal passed confidence, freshness, position, cooldown, and risk controls",
+            "Signal passed confidence, freshness, position, cooldown, risk, and worker controls",
             evaluated_at,
             risk_decision=risk,
             order_request=order,
@@ -202,16 +205,16 @@ class StrategyDecisionGate:
         winning_action = SignalAction.BUY if buy_count > sell_count else SignalAction.SELL
         winning_count = max(buy_count, sell_count)
         ratio = winning_count / len(directional)
+        evaluated_at = now or datetime.now(timezone.utc)
         if buy_count == sell_count or ratio < self.minimum_consensus_ratio:
-            evaluated_at = now or datetime.now(timezone.utc)
             return [
                 self._decision(item, DecisionStatus.REJECTED, "STRATEGY_DISAGREEMENT", f"Directional consensus {ratio:.0%} is below required {self.minimum_consensus_ratio:.0%}", evaluated_at)
                 for item in items
             ]
         return [
-            self.evaluate(item, existing_position_quantity=existing_position_quantity, now=now)
+            self.evaluate(item, existing_position_quantity=existing_position_quantity, now=evaluated_at)
             if item.action == winning_action
-            else self._decision(item, DecisionStatus.SUPPRESSED, "MINORITY_DIRECTION", f"Consensus selected {winning_action.value}", now or datetime.now(timezone.utc))
+            else self._decision(item, DecisionStatus.SUPPRESSED, "MINORITY_DIRECTION", f"Consensus selected {winning_action.value}", evaluated_at)
             for item in items
         ]
 
@@ -226,7 +229,7 @@ class StrategyDecisionGate:
         risk_decision: RiskDecision | None = None,
         order_request: OrderRequest | None = None,
     ) -> DecisionEvidence:
-        return DecisionEvidence(
+        evidence = DecisionEvidence(
             signal_id=signal.signal_id,
             status=status,
             reason_code=reason_code,
@@ -238,3 +241,6 @@ class StrategyDecisionGate:
             risk_decision=risk_decision,
             order_request=order_request,
         )
+        if self.decision_journal is not None:
+            self.decision_journal.record_decision(signal, evidence)
+        return evidence
