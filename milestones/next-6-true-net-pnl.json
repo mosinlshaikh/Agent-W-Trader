@@ -1,0 +1,22 @@
+{
+  "milestone": "Next 6",
+  "title": "True Net-P&L and Trading Cost Engine",
+  "status": "verified-complete",
+  "source_commit": "bc830e1cbcc112dd6dcc4f2f21806db318bbeb57",
+  "ci_run": 59,
+  "python": ["3.11", "3.12"],
+  "features": [
+    "effective-dated fee schedules",
+    "brokerage with cap",
+    "side-specific STT",
+    "exchange charges",
+    "SEBI charges",
+    "GST",
+    "stamp duty",
+    "modeled and observed slippage",
+    "gross-to-net PnL",
+    "missing schedule fail-closed",
+    "overlap protection"
+  ],
+  "live_money_enabled": false
+}
