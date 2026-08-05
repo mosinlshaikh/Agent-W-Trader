@@ -1,0 +1,19 @@
+{
+  "milestone": "Next 5",
+  "title": "Persistent Decision Journal & Worker Accountability",
+  "status": "COMPLETE",
+  "verified_ci_run": 57,
+  "source_commit": "3f852963fd9ee826d4ff5851d1e4548da2413a33",
+  "capabilities": [
+    "persistent agent decisions",
+    "approved rejected suppressed counts",
+    "signal decision order traceability",
+    "realized PnL attribution by worker",
+    "restart-safe worker history",
+    "worker performance scoring",
+    "automatic poor-worker quarantine",
+    "audited manual reinstatement"
+  ],
+  "mode": "PAPER_ONLY",
+  "live_money": false
+}
