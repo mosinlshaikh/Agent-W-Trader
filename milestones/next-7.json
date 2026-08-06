@@ -1,0 +1,23 @@
+{
+  "milestone": "Next 7",
+  "title": "Realistic Event-Driven Exchange Simulator",
+  "status": "verified",
+  "ci_run": 62,
+  "source_commit": "aa397c9f8af7846e5035c074d86d64eb9e8ac44b",
+  "capabilities": [
+    "deterministic event clock",
+    "market and limit orders",
+    "bid-ask book consumption",
+    "partial fills",
+    "price-time priority",
+    "scheduled latency",
+    "market impact",
+    "cancel and replace races",
+    "priority reset after replace",
+    "exchange halts",
+    "circuit limits",
+    "fail-closed rejections"
+  ],
+  "mode": "paper-only",
+  "live_money": false
+}
