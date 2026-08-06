@@ -1,5 +1,4 @@
 """Deterministic event-driven exchange simulator for realistic paper execution."""
-
 from __future__ import annotations
 
 import heapq
@@ -87,14 +86,11 @@ class UnknownOrderError(KeyError):
 
 
 class ExchangeSimulator:
-    """Price-time-priority exchange model with latency and fail-closed controls."""
+    """Price-time-priority model with latency, impact, races and exchange controls."""
 
-    def __init__(
-        self,
-        *,
-        latency_ms: int = 25,
-        market_impact_bps_per_full_level: float = 1.0,
-    ) -> None:
+    TERMINAL = {SimOrderStatus.FILLED, SimOrderStatus.CANCELLED, SimOrderStatus.REJECTED}
+
+    def __init__(self, *, latency_ms: int = 25, market_impact_bps_per_full_level: float = 1.0) -> None:
         if latency_ms < 0 or market_impact_bps_per_full_level < 0:
             raise ValueError("latency and impact must be non-negative")
         self.latency_ms = latency_ms
@@ -114,8 +110,8 @@ class ExchangeSimulator:
         self._resting_sell: list[tuple[float, int, str]] = []
 
     def seed_book(self, *, bids: Iterable[BookLevel], asks: Iterable[BookLevel]) -> None:
-        self.bids = sorted(list(bids), key=lambda x: x.price, reverse=True)
-        self.asks = sorted(list(asks), key=lambda x: x.price)
+        self.bids = sorted(list(bids), key=lambda level: level.price, reverse=True)
+        self.asks = sorted(list(asks), key=lambda level: level.price)
         if self.bids and self.asks and self.bids[0].price >= self.asks[0].price:
             raise ValueError("seeded book must not be crossed")
 
@@ -126,7 +122,7 @@ class ExchangeSimulator:
 
     def set_halted(self, halted: bool) -> None:
         self.halted = bool(halted)
-        self.events.append(ExchangeEvent(self.now_ms, "HALT" if halted else "RESUME", None, "exchange state changed"))
+        self._event("HALT" if halted else "RESUME", None, "exchange state changed")
 
     def submit(self, order: SimOrder) -> str:
         if order.order_id in self.orders:
@@ -134,13 +130,13 @@ class ExchangeSimulator:
         order.submitted_at_ms = self.now_ms
         order.active_at_ms = self.now_ms + self.latency_ms
         self.orders[order.order_id] = order
-        self._schedule(order.active_at_ms, "ACTIVATE", order.order_id, None)
-        self.events.append(ExchangeEvent(self.now_ms, "SUBMITTED", order.order_id, f"active at {order.active_at_ms}ms"))
+        self._schedule(order.active_at_ms, "ACTIVATE", order.order_id)
+        self._event("SUBMITTED", order.order_id, f"active at {order.active_at_ms}ms")
         return order.order_id
 
     def cancel(self, order_id: str) -> None:
-        order = self._order(order_id)
-        self._schedule(self.now_ms + self.latency_ms, "CANCEL", order_id, None)
+        self._order(order_id)
+        self._schedule(self.now_ms + self.latency_ms, "CANCEL", order_id)
 
     def replace(self, order_id: str, *, quantity: int, limit_price: float) -> None:
         if quantity <= 0 or limit_price <= 0:
@@ -154,13 +150,14 @@ class ExchangeSimulator:
         while self._pending and self._pending[0][0] <= target_ms:
             occurred_at, _, action, order_id, payload = heapq.heappop(self._pending)
             self.now_ms = occurred_at
+            order = self._order(order_id)
             if action == "ACTIVATE":
-                self._activate(self._order(order_id))
+                self._activate(order)
             elif action == "CANCEL":
-                self._apply_cancel(self._order(order_id))
-            elif action == "REPLACE":
+                self._apply_cancel(order)
+            else:
                 quantity, limit_price = payload  # type: ignore[misc]
-                self._apply_replace(self._order(order_id), int(quantity), float(limit_price))
+                self._apply_replace(order, int(quantity), float(limit_price))
         self.now_ms = target_ms
 
     def _activate(self, order: SimOrder) -> None:
@@ -171,43 +168,41 @@ class ExchangeSimulator:
             self._reject(order, "PRICE_OUTSIDE_CIRCUIT")
             return
         order.status = SimOrderStatus.OPEN
-        self.events.append(ExchangeEvent(self.now_ms, "ACTIVE", order.order_id, "order entered matching engine"))
+        self._event("ACTIVE", order.order_id, "order entered matching engine")
         self._match(order)
-        if order.remaining_quantity > 0 and order.order_type == SimOrderType.LIMIT:
+        if order.remaining_quantity and order.order_type == SimOrderType.LIMIT:
             self._rest(order)
-        elif order.remaining_quantity > 0 and order.order_type == SimOrderType.MARKET:
+        elif order.remaining_quantity:
             self._reject_remainder(order, "INSUFFICIENT_LIQUIDITY")
 
     def _match(self, order: SimOrder) -> None:
         levels = self.asks if order.side == Side.BUY else self.bids
         consumed = 0
-        while order.remaining_quantity > 0 and levels:
+        while order.remaining_quantity and levels:
             level = levels[0]
             if order.order_type == SimOrderType.LIMIT:
                 crosses = level.price <= float(order.limit_price) if order.side == Side.BUY else level.price >= float(order.limit_price)
                 if not crosses:
                     break
-            fill_qty = min(order.remaining_quantity, level.quantity)
-            impact = level.price * (self.market_impact_bps_per_full_level / 10_000) * consumed
-            price = level.price + impact if order.side == Side.BUY else level.price - impact
-            if not self._inside_circuit(price):
+            fill_quantity = min(order.remaining_quantity, level.quantity)
+            impact = level.price * self.market_impact_bps_per_full_level / 10_000 * consumed
+            fill_price = level.price + impact if order.side == Side.BUY else level.price - impact
+            if not self._inside_circuit(fill_price):
                 self._reject_remainder(order, "MARKET_IMPACT_OUTSIDE_CIRCUIT")
-                break
-            self._record_fill(order, fill_qty, price)
-            remaining_level = level.quantity - fill_qty
-            if remaining_level:
-                levels[0] = BookLevel(level.price, remaining_level)
+                return
+            self._record_fill(order, fill_quantity, fill_price)
+            level_remainder = level.quantity - fill_quantity
+            if level_remainder:
+                levels[0] = BookLevel(level.price, level_remainder)
             else:
                 levels.pop(0)
                 consumed += 1
 
     def _rest(self, order: SimOrder) -> None:
         sequence = next(self._sequence)
-        if order.side == Side.BUY:
-            heapq.heappush(self._resting_buy, (-float(order.limit_price), sequence, order.order_id))
-        else:
-            heapq.heappush(self._resting_sell, (float(order.limit_price), sequence, order.order_id))
-        self.events.append(ExchangeEvent(self.now_ms, "RESTING", order.order_id, "price-time priority assigned"))
+        item = ((-1 if order.side == Side.BUY else 1) * float(order.limit_price), sequence, order.order_id)
+        heapq.heappush(self._resting_buy if order.side == Side.BUY else self._resting_sell, item)
+        self._event("RESTING", order.order_id, "price-time priority assigned")
 
     def execute_external_trade(self, *, price: float, quantity: int, aggressor_side: Side) -> None:
         if price <= 0 or quantity <= 0 or self.halted or not self._inside_circuit(price):
@@ -215,74 +210,84 @@ class ExchangeSimulator:
         heap = self._resting_sell if aggressor_side == Side.BUY else self._resting_buy
         remaining = quantity
         deferred: list[tuple[float, int, str]] = []
-        while heap and remaining > 0:
-            priority, sequence, order_id = heapq.heappop(heap)
+        while heap and remaining:
+            item = heapq.heappop(heap)
+            _, _, order_id = item
             order = self._order(order_id)
             if order.status not in {SimOrderStatus.OPEN, SimOrderStatus.PARTIALLY_FILLED}:
                 continue
             limit = float(order.limit_price)
             eligible = limit <= price if order.side == Side.SELL else limit >= price
             if not eligible:
-                deferred.append((priority, sequence, order_id))
+                deferred.append(item)
                 break
-            fill_qty = min(remaining, order.remaining_quantity)
-            self._record_fill(order, fill_qty, limit)
-            remaining -= fill_qty
-            if order.remaining_quantity > 0:
-                deferred.append((priority, sequence, order_id))
+            fill_quantity = min(remaining, order.remaining_quantity)
+            self._record_fill(order, fill_quantity, limit)
+            remaining -= fill_quantity
+            if order.remaining_quantity:
+                deferred.append(item)
         for item in deferred:
             heapq.heappush(heap, item)
 
+    def _remove_resting(self, order_id: str) -> None:
+        self._resting_buy = [item for item in self._resting_buy if item[2] != order_id]
+        self._resting_sell = [item for item in self._resting_sell if item[2] != order_id]
+        heapq.heapify(self._resting_buy)
+        heapq.heapify(self._resting_sell)
+
     def _apply_cancel(self, order: SimOrder) -> None:
-        if order.status in {SimOrderStatus.FILLED, SimOrderStatus.CANCELLED, SimOrderStatus.REJECTED}:
-            self.events.append(ExchangeEvent(self.now_ms, "CANCEL_REJECTED", order.order_id, "order already terminal"))
+        if order.status in self.TERMINAL:
+            self._event("CANCEL_REJECTED", order.order_id, "order already terminal")
             return
+        self._remove_resting(order.order_id)
         order.status = SimOrderStatus.CANCELLED
-        self.events.append(ExchangeEvent(self.now_ms, "CANCELLED", order.order_id, "cancel won race"))
+        self._event("CANCELLED", order.order_id, "cancel won race")
 
     def _apply_replace(self, order: SimOrder, quantity: int, limit_price: float) -> None:
-        if order.status in {SimOrderStatus.FILLED, SimOrderStatus.CANCELLED, SimOrderStatus.REJECTED}:
-            self.events.append(ExchangeEvent(self.now_ms, "REPLACE_REJECTED", order.order_id, "order already terminal"))
-            return
-        if quantity < order.quantity - order.remaining_quantity or not self._inside_circuit(limit_price):
-            self.events.append(ExchangeEvent(self.now_ms, "REPLACE_REJECTED", order.order_id, "invalid replacement"))
+        if order.status in self.TERMINAL:
+            self._event("REPLACE_REJECTED", order.order_id, "order already terminal")
             return
         filled = order.quantity - order.remaining_quantity
+        if quantity < filled or not self._inside_circuit(limit_price):
+            self._event("REPLACE_REJECTED", order.order_id, "invalid replacement")
+            return
+        self._remove_resting(order.order_id)
         order.quantity = quantity
         order.remaining_quantity = quantity - filled
         order.limit_price = limit_price
         order.status = SimOrderStatus.OPEN
-        self._rest(order)
-        self.events.append(ExchangeEvent(self.now_ms, "REPLACED", order.order_id, "priority reset"))
+        if order.remaining_quantity:
+            self._rest(order)
+        else:
+            order.status = SimOrderStatus.FILLED
+        self._event("REPLACED", order.order_id, "priority reset")
 
     def _record_fill(self, order: SimOrder, quantity: int, price: float) -> None:
         order.remaining_quantity -= quantity
-        order.status = SimOrderStatus.FILLED if order.remaining_quantity == 0 else SimOrderStatus.PARTIALLY_FILLED
-        fill = Fill(order.order_id, order.symbol, order.side, quantity, price, self.now_ms)
-        self.fills.append(fill)
-        self.events.append(ExchangeEvent(self.now_ms, "FILL", order.order_id, f"{quantity}@{price:.4f}"))
+        order.status = SimOrderStatus.FILLED if not order.remaining_quantity else SimOrderStatus.PARTIALLY_FILLED
+        self.fills.append(Fill(order.order_id, order.symbol, order.side, quantity, price, self.now_ms))
+        self._event("FILL", order.order_id, f"{quantity}@{price:.4f}")
 
     def _reject(self, order: SimOrder, reason: str) -> None:
         order.status = SimOrderStatus.REJECTED
         order.rejection_reason = reason
-        self.events.append(ExchangeEvent(self.now_ms, "REJECTED", order.order_id, reason))
+        self._event("REJECTED", order.order_id, reason)
 
     def _reject_remainder(self, order: SimOrder, reason: str) -> None:
         if order.remaining_quantity == order.quantity:
             self._reject(order, reason)
         else:
             order.rejection_reason = reason
-            self.events.append(ExchangeEvent(self.now_ms, "REMAINDER_REJECTED", order.order_id, reason))
+            self._event("REMAINDER_REJECTED", order.order_id, reason)
 
     def _inside_circuit(self, price: float) -> bool:
-        if self.circuit_lower is not None and price < self.circuit_lower:
-            return False
-        if self.circuit_upper is not None and price > self.circuit_upper:
-            return False
-        return True
+        return not ((self.circuit_lower is not None and price < self.circuit_lower) or (self.circuit_upper is not None and price > self.circuit_upper))
 
-    def _schedule(self, occurred_at_ms: int, action: str, order_id: str, payload: object | None) -> None:
-        heapq.heappush(self._pending, (occurred_at_ms, next(self._sequence), action, order_id, payload))
+    def _schedule(self, at_ms: int, action: str, order_id: str, payload: object | None = None) -> None:
+        heapq.heappush(self._pending, (at_ms, next(self._sequence), action, order_id, payload))
+
+    def _event(self, event_type: str, order_id: str | None, detail: str) -> None:
+        self.events.append(ExchangeEvent(self.now_ms, event_type, order_id, detail))
 
     def _order(self, order_id: str) -> SimOrder:
         try:
