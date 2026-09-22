@@ -1,0 +1,5 @@
+package com.ttrl.agentw.core
+
+data class PortfolioRow(val symbol:String,val quantity:Double,val averagePrice:Money,val livePrice:Money,val marketValue:Money,val unrealizedPnl:Money)
+data class PortfolioSnapshot(val account:BrokerAccountSnapshot,val positions:List<PortfolioRow>,val observedAtEpochMs:Long)
+class PortfolioService(private val accountProvider:AccountDataProvider,private val marketData:LiveMarketDataProvider){fun snapshot(domain:MarketDomain,nowMs:Long):PortfolioSnapshot{val account=AccountDataGuard().verify(accountProvider.account(),nowMs);val rows=accountProvider.positions().map{p->val q=LiveQuoteGuard().verify(marketData.quote(domain,p.symbol),nowMs);require(q.provider.isNotBlank());require(p.averagePrice.currency==account.equity.currency);val mv=p.quantity*q.last;PortfolioRow(p.symbol,p.quantity,p.averagePrice,Money(q.last,account.equity.currency),Money(mv,account.equity.currency),Money((q.last-p.averagePrice.amount)*p.quantity,account.equity.currency))};return PortfolioSnapshot(account,rows,nowMs)}}
